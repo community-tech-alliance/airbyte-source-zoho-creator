@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "unique": {
+      "type": [ "null", "boolean" ] 
+    },
+    "max_char": {
+      "format": "int32",
+      "type": [ "null", "integer" ] 
+    },
+    "display_name": {
+      "type": [ "null", "string" ] 
+    },
+    "link_name": {
+      "type": [ "null", "string" ] 
+    },
+    "type": {
+      "format": "int32",
+      "type": [ "null", "integer" ] 
+    },
+    "mandatory": {
+      "type": [ "null", "boolean" ] 
+    },
+    "choices": {
+      "type": [ "null", "array" ],
+      "fields": {
+        "type": "object",
+        "properties": {
+          "key" : {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "subfields": {
+      "type": [ "null", "array" ],
+      "fields": {
+        "type": "object",
+        "properties": {
+          "unique": {
+            "type": [ "null", "boolean" ] 
+          },
+          "max_char": {
+            "format": "int32",
+            "type": [ "null", "integer" ] 
+          },
+          "display_name": {
+            "type": [ "null", "string" ] 
+          },
+          "link_name": {
+            "type": [ "null", "string" ] 
+          },
+          "type": {
+            "format": "int32",
+            "type": [ "null", "integer" ] 
+          },
+          "mandatory": {
+            "type": [ "null", "boolean" ] 
+          },
+          "choices": {
+            "type": [ "null", "array" ],
+            "fields": {
+              "type": "object",
+              "properties": {
+                "key" : {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

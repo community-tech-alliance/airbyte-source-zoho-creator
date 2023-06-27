@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "display_name": {
+      "type": [ "null", "string" ] 
+    },
+    "link_name": {
+      "type": [ "null", "string" ] 
+    },
+    "application_link_name": {
+      "type": [ "null", "string" ] 
+    }
+  }
+}

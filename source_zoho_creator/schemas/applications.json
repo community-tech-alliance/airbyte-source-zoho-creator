@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "application_name": {
+      "type": [ "null", "string" ] 
+    },
+    "date_format": {
+      "type": [ "null", "string" ] 
+    },
+    "creation_date": {
+      "type": [ "null", "string" ] 
+    },
+    "link_name": {
+      "type": [ "null", "string" ] 
+    },
+    "category": {
+      "format": "int32",
+      "type": ["null", "integer"]
+    },
+    "time_zone": {
+      "type": [ "null", "string" ] 
+    },
+    "created_by": {
+      "type": [ "null", "string" ] 
+    },
+    "workspace_name": {
+      "type": [ "null", "string" ] 
+    }
+  }
+}
