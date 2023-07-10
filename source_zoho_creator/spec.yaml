@@ -11,10 +11,13 @@ connectionSpecification:
     client_id:
       type: string
       description: OAuth Client ID
+      airbyte_secret: true
     client_secret:
       type: string
       description: OAuth Client Secret
+      airbyte_secret: true
     refresh_token:
       type: string
       description: OAuth Refresh Token
+      airbyte_secret: true
     

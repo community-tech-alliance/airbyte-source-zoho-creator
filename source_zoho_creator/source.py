@@ -2,7 +2,6 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 
-import enum
 from abc import ABC
 from typing import Any, Iterable, List, Mapping, MutableMapping, Optional, Tuple
 from airbyte_cdk.models import SyncMode
@@ -14,11 +13,18 @@ from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.sources.streams.http import HttpStream, HttpSubStream
 from airbyte_cdk.sources.streams.http.auth import Oauth2Authenticator
 
+# TODO: implement BulkApiStream to bulk load Report data from the Zoho Creator
+# Challenges and Notes of this BulkApiStream 
+# - Bulk API is Async and has 3 seperate endpoints that need to be called for a single Bulk job (Create Job, Check Job Status, Get Results)
+# - Each bulk job can sync a max of 200k records, if there are more records a seperate Bulk job has to be created with returned recordCursor 
+# - Airbyte Schema for the stream has to be dynamically generated using a combination of the Fields Endpoin and the Reports Quickview Endpoint
+# - Bulk API returns zipped CSV files, these have to be unzipped and read record by record and converted to JSON schema for Airbyte
+
 
 # Basic full refresh stream
 class ZohoCreatorStream(HttpStream, ABC):
     """
-    Base Full Refresh Stream for Zoho Creator API
+    Base Full Refresh Stream for Zoho Creator API.
     """
 
     url_base = "https://creator.zoho.com/api/v2/"
@@ -36,6 +42,7 @@ class ZohoCreatorStream(HttpStream, ABC):
         :return If there is another page in the result, a mapping (e.g: dict) containing information needed to query the next page in the response.
                 If there are no more pages in the result, return None.
         """
+        # API does not have Pagination
         return None
     
     def request_params(
@@ -57,10 +64,11 @@ class ZohoCreatorStream(HttpStream, ABC):
 
 class Applications(ZohoCreatorStream):
     """
-    Stream to sync results for the Applications Endpoint.
+    Stream to sync results for the Applications Endpoint. Parent Stream for 
+    the rest of Streams.
+    This API fetches the meta information of all the applications that you have access to.
 
     :param authenticator: OAuth Athenticator to generate Access Tokens
-    :param username: The username of the of the Application owner
     """
 
     primary_key = "link_name"
@@ -84,10 +92,12 @@ class Applications(ZohoCreatorStream):
 
 class Pages(HttpSubStream, ZohoCreatorStream):
     """
-    Stream to sync results for the Applications Endpoint.
+    Stream to sync results for the Pages Endpoint. Child Stream of Applications Stream
+    creates a stream slice for each Application record.
+
+    This API fetches the meta information of all the pages present in a Zoho Creator application.
 
     :param authenticator: OAuth Athenticator to generate Access Tokens
-    :param username: The 
     """
 
     primary_key = "link_name"
@@ -98,6 +108,7 @@ class Pages(HttpSubStream, ZohoCreatorStream):
     def path(
         self, stream_state: Mapping[str, Any] = None, stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
     ) -> str:
+        # Create URL request path from parent Application Record (stream_slice)
         return f"{stream_slice['parent']['workspace_name']}/{stream_slice['parent']['link_name']}/pages"
 
     def parse_response(self, response: requests.Response, stream_slice: Mapping[str, Any] = None, **kwargs) -> Iterable[Mapping]:
@@ -108,6 +119,7 @@ class Pages(HttpSubStream, ZohoCreatorStream):
         # Get Parent Stream ID
         parent_application = stream_slice["parent"]["link_name"]
         pages = response.json().get("pages",[])
+        # Add the parent application link_name to the Page record
         for page in pages:
             page["application_link_name"] = parent_application
         yield from pages
@@ -115,7 +127,10 @@ class Pages(HttpSubStream, ZohoCreatorStream):
 
 class Reports(HttpSubStream, ZohoCreatorStream):
     """
-    Stream to sync results for the Reports Endpoint.
+    Stream to sync results for the Reports Endpoint.Child Stream of Applications Stream
+    creates a stream slice for each Application record.
+
+    This API fetches the meta information of all the reports present in a Zoho Creator application.
 
     :param authenticator: OAuth Athenticator to generate Access Tokens
     :param username: The 
@@ -129,6 +144,7 @@ class Reports(HttpSubStream, ZohoCreatorStream):
     def path(
         self, stream_state: Mapping[str, Any] = None, stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
     ) -> str:
+        # Create URL request path from parent Application Record (stream_slice)
         return f"{stream_slice['parent']['workspace_name']}/{stream_slice['parent']['link_name']}/reports"
 
     def parse_response(self, response: requests.Response, stream_slice: Mapping[str, Any] = None, **kwargs) -> Iterable[Mapping]:
@@ -139,6 +155,7 @@ class Reports(HttpSubStream, ZohoCreatorStream):
         # Get Parent Stream ID
         parent_application = stream_slice["parent"]["link_name"]
         reports = response.json().get("reports",[])
+        # Add the parent Application link_name to the report record
         for report in reports:
             report["application_link_name"] = parent_application
         yield from reports
@@ -146,14 +163,19 @@ class Reports(HttpSubStream, ZohoCreatorStream):
 
 class Forms(HttpSubStream, ZohoCreatorStream):
     """
-    Stream to sync results for the Forms Endpoint.
+    Stream to sync results for the Forms Endpoint.Child Stream of Applications Stream
+    creates a stream slice for each Application record.
+
+    This API fetches the meta information of all the forms present in a Zoho Creator application.
 
     :param authenticator: OAuth Athenticator to generate Access Tokens
-    :param username: The 
     """
 
     primary_key = "link_name"
 
+    # This stream uses caching since we'll need to iterate through
+    # all forms in the Fields Stream. This prevents us from making 
+    # extra API calls to grab Forms
     @property
     def use_cache(self) -> bool:
         return True
@@ -164,6 +186,7 @@ class Forms(HttpSubStream, ZohoCreatorStream):
     def path(
         self, stream_state: Mapping[str, Any] = None, stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
     ) -> str:
+        # Create URL request path from parent Application Record (stream_slice)
         return f"{stream_slice['parent']['workspace_name']}/{stream_slice['parent']['link_name']}/forms"
 
     def parse_response(self, response: requests.Response, stream_slice: Mapping[str, Any] = None, **kwargs) -> Iterable[Mapping]:
@@ -175,6 +198,8 @@ class Forms(HttpSubStream, ZohoCreatorStream):
         parent_application = stream_slice["parent"]["link_name"]
         workspace_name = stream_slice["parent"]["workspace_name"]
         forms = response.json().get("forms",[])
+        # Add the parent application link_name and the workspace_name to the
+        # form record for the child Fields stream to use
         for form in forms:
             form["application_link_name"] = parent_application
             form["workspace_name"] = workspace_name
@@ -183,17 +208,20 @@ class Forms(HttpSubStream, ZohoCreatorStream):
   
 class Fields(HttpSubStream, Applications):
     """
-    Stream to sync results for the Fields Endpoint.
+    Stream to sync results for the Fields Endpoint. Child Stream of Applications and Forms stream
+    creates a stream slice for each Forms record.
+
+    This API fetches the meta information of all the fields present in a form of a Zoho Creator application.
 
     :param authenticator: OAuth Athenticator to generate Access Tokens
-    :param username: The 
     """
 
     primary_key = "link_name"
 
-    @property
-    def use_cache(self) -> bool:
-        return True
+    # TODO: Enable Field caching to be used for schema generation of the BulkApiStream
+    # @property
+    # def use_cache(self) -> bool:
+    #     return True
 
     def __init__(self, **kwargs):
         super().__init__(Applications(**kwargs),**kwargs)
@@ -224,6 +252,7 @@ class Fields(HttpSubStream, Applications):
     def path(
         self, stream_state: Mapping[str, Any] = None, stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
     ) -> str:
+        # Use the Parent Form record to generate the Field URL
         return (
             f"{stream_slice['parent']['workspace_name']}/{stream_slice['parent']['application_link_name']}/form/{stream_slice['parent']['link_name']}/fields"
         )
@@ -237,6 +266,7 @@ class Fields(HttpSubStream, Applications):
         parent_application = stream_slice["parent"]["application_link_name"]
         form_link_name = stream_slice["parent"]["link_name"]
         fields = response.json().get("fields",[])
+        # Add fields for identifying which application and form this field is for
         for field in fields:
             field["application_link_name"] = parent_application
             field["form_link_name"] = form_link_name
@@ -289,4 +319,6 @@ class SourceZohoCreator(AbstractSource):
             Forms(authenticator=auth),
             Fields(authenticator=auth)
         ]
+
+        # TODO: Dynamically create BulkApiStreams for each input Bulk Report to sync.
         return streams
